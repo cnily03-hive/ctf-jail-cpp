@@ -1,5 +1,7 @@
+use jailapi::context::read_ctx_file;
+
 pub fn collect() {
-    Err("Err must be a string")
+    Ok(#{"x":1})
 }
 
 pub fn check(user_input) {

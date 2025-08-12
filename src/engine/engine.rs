@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Error, Result};
 use rune::termcolor::{ColorChoice, StandardStream};
 use rune::{Context, Diagnostics, Source, Sources, Value, Vm};
 use std::{path::Path, sync::Arc};
@@ -63,22 +63,32 @@ impl RuneEngine {
 
     fn process_result(&self, value: Value) -> Result<Result<String, String>> {
         // 尝试从Result类型中提取值
-        match rune::from_value::<Result<Value, String>>(value.clone()) {
+        match rune::from_value::<Result<Value, Value>>(value.clone()) {
             // rune returns Result
             Ok(result) => match result {
-                // rune returns a success value
-                Ok(success_value) => Ok(Ok(stringify_rune_value(success_value)?)),
-                // rune returns a error value
-                Err(error_msg) => Ok(Err(error_msg)),
+                // rune script successfully returns a success value
+                Ok(success_value) => Ok(Ok(rune_value_throw_or_stringify(success_value)?)),
+                // rune script successfully returns a error value
+                Err(error_value) => Ok(match rune::from_value::<String>(&error_value) {
+                    Ok(error_msg) => Err(error_msg),
+                    Err(_) => Err(rune_value_throw_or_stringify(error_value)?),
+                }),
             },
             // rune returns non Result, treat it as a success returned value
-            Err(_) => Ok(Ok(stringify_rune_value(value)?)),
+            Err(_) => Ok(Ok(rune_value_throw_or_stringify(value)?)),
         }
     }
 }
 
 /// 将 Rune Value 转换为 JSON 字符串
-fn stringify_rune_value(value: Value) -> Result<String> {
+fn rune_value_throw_or_stringify(value: Value) -> Result<String> {
+    // 如果是 Error 对象，抛出运行时异常
+    if let Ok(e) = rune::from_value::<anyhow::Error>(value.clone()) {
+        return Err(e);
+    }
+    if let Ok(e) = rune::from_value::<std::io::Error>(value.clone()) {
+        return Err(e.into());
+    }
     // 尝试将 Rune Value 转换为 serde_json::Value
     match rune::to_value(&value) {
         Ok(json_value) => {
@@ -87,12 +97,8 @@ fn stringify_rune_value(value: Value) -> Result<String> {
                 .map_err(|e| anyhow::anyhow!("无法序列化值: {:?}, 错误: {}", value, e))
         }
         Err(e) => {
-            // 如果无法转换为 JSON，尝试转换为字符串
-            match rune::from_value::<String>(value.clone()) {
-                Ok(s) => serde_json::to_string(&s)
-                    .map_err(|e| anyhow::anyhow!("无法序列化字符串: {}, 错误: {}", s, e)),
-                Err(_) => Err(anyhow::anyhow!("无法转换值: {:?}, 错误: {}", value, e)),
-            }
+            // direct throw runtime error
+            Err(e.into())
         }
     }
 }

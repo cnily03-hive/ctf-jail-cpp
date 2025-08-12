@@ -23,15 +23,41 @@ use sandbox::SandboxManager;
 
 const MAIN_RUNE_FILE: &str = "configure.rn";
 
-fn format_result_output(result: &Result<String, String>) {
+fn format_result_output(result: &Result<String, String>, parse_json: bool) {
     match result {
         Ok(output) => {
-            println!(
-                "{} {}",
-                "Script is compiled and run successfully:".green(),
-                "Ok()".blue()
-            );
-            println!("{}", output);
+            if parse_json {
+                match serde_json::from_str::<serde_json::Value>(output) {
+                    Ok(json_value) => {
+                        println!(
+                            "{} {} {}",
+                            "Script is compiled and run successfully:".green(),
+                            "Ok()".blue(),
+                            "-> Parsed & Pretty".cyan()
+                        );
+                        if let Some(string_value) = json_value.as_str() {
+                            println!("{}", string_value);
+                        } else {
+                            println!("{}", serde_json::to_string_pretty(&json_value).unwrap());
+                        }
+                    }
+                    Err(_) => {
+                        println!(
+                            "{} {} {}",
+                            "Script is compiled and run successfully:".green(),
+                            "Ok()".blue(),
+                            "->  Parsed & Pretty failed".yellow()
+                        );
+                    }
+                }
+            } else {
+                println!(
+                    "{} {}",
+                    "Script is compiled and run successfully:".green(),
+                    "Ok()".blue()
+                );
+                println!("{}", output);
+            }
         }
         Err(error_msg) => {
             println!(
@@ -62,12 +88,17 @@ async fn main() -> Result<()> {
             context,
             exec,
         } => run_server(port, host, context, exec).await,
-        Commands::Collect { exec, context } => run_collect(exec, context).await,
+        Commands::Collect {
+            exec,
+            context,
+            parse,
+        } => run_collect(exec, context, parse).await,
         Commands::Check {
             exec,
             input,
             context,
-        } => run_check(exec, input, context).await,
+            parse,
+        } => run_check(exec, input, context, parse).await,
     }
 }
 
@@ -126,7 +157,7 @@ async fn run_server(
     Ok(())
 }
 
-async fn run_collect(exec: Option<PathBuf>, context: PathBuf) -> Result<()> {
+async fn run_collect(exec: Option<PathBuf>, context: PathBuf, parse_json: bool) -> Result<()> {
     // 确定Rune脚本路径
     let file = match exec {
         Some(path) => path,
@@ -146,11 +177,16 @@ async fn run_collect(exec: Option<PathBuf>, context: PathBuf) -> Result<()> {
     let rune_engine = RuneEngine::new(&file, &context).await?;
     let result = rune_engine.call_collect().await?;
 
-    format_result_output(&result);
+    format_result_output(&result, parse_json);
     Ok(())
 }
 
-async fn run_check(exec: Option<PathBuf>, user_input: String, context: PathBuf) -> Result<()> {
+async fn run_check(
+    exec: Option<PathBuf>,
+    user_input: String,
+    context: PathBuf,
+    parse_json: bool,
+) -> Result<()> {
     // 确定Rune脚本路径
     let file = match exec {
         Some(path) => path,
@@ -172,7 +208,7 @@ async fn run_check(exec: Option<PathBuf>, user_input: String, context: PathBuf) 
 
     // 创建临时沙箱
     let sandbox_id = uuid::Uuid::new_v4().to_string();
-    let sandbox = sandbox_manager.create_sandbox(&sandbox_id).await?;
+    // let sandbox = sandbox_manager.create_sandbox(&sandbox_id).await?;
 
     let result = rune_engine.call_check(&user_input).await?;
 
@@ -181,7 +217,7 @@ async fn run_check(exec: Option<PathBuf>, user_input: String, context: PathBuf) 
         eprintln!("警告: 清理沙箱失败: {}", err);
     }
 
-    format_result_output(&result);
+    format_result_output(&result, parse_json);
     Ok(())
 }
 

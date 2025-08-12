@@ -1,4 +1,4 @@
-use rune::{ContextError, Module};
+use rune::{modules::any, ContextError, Module};
 use std::{fs, io, path::PathBuf, sync::OnceLock};
 
 // 使用 OnceLock 来存储全局的 context_path
@@ -40,11 +40,13 @@ pub fn read_ctx_file(file_path: &str) -> Result<String, io::Error> {
             format!("文件不存在: {}", file_path),
         )
     })?;
+    println!("{}", path.to_string_lossy());
 
     if !canonical_file.starts_with(&canonical_context) {
+        println!("No");
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            "不允许访问上下文目录外的文件",
+            format!("不允许访问上下文目录外的文件: {}", file_path),
         ));
     }
 

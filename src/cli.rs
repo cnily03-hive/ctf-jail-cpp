@@ -39,6 +39,10 @@ pub enum Commands {
         /// 上下文目录路径
         #[arg(short, long, default_value = "./context")]
         context: PathBuf,
+
+        /// 是否解析 JSON 输出
+        #[arg(short = 'P', long, default_value = "false")]
+        parse: bool,
     },
     /// 运行check函数并返回结果
     Check {
@@ -53,5 +57,9 @@ pub enum Commands {
         /// 上下文目录路径
         #[arg(short, long, default_value = "./context")]
         context: PathBuf,
+
+        /// 是否解析 JSON 输出
+        #[arg(short = 'P', long, default_value = "false")]
+        parse: bool,
     },
 }
