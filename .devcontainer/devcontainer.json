@@ -3,7 +3,7 @@
         "dockerfile": "./Dockerfile",
         "context": ".",
         "args": {
-            "VARIANT": "bullseye"
+            "VARIANT": "bookworm"
         }
     },
     "features": {
