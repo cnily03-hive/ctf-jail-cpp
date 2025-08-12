@@ -1,0 +1,9 @@
+pub fn collect(ctx) {
+    ctx.bucket().read("docs.md")
+}
+
+pub fn check(ctx, user_input) {
+    Ok(#{
+        "Your input": user_input
+    })
+}

@@ -22,9 +22,9 @@ pub enum Commands {
         #[arg(short = 'H', long, default_value = "127.0.0.1")]
         host: String,
 
-        /// Context directory path
-        #[arg(short, long, default_value = "./context")]
-        context: PathBuf,
+        /// Data bucket directory path
+        #[arg(short, long, default_value = "./bucket")]
+        dir: PathBuf,
 
         /// Rune script file path
         #[arg(short, long)]
@@ -36,9 +36,9 @@ pub enum Commands {
         #[arg(short, long)]
         exec: Option<PathBuf>,
 
-        /// Context directory path
-        #[arg(short, long, default_value = "./context")]
-        context: PathBuf,
+        /// Data bucket directory path
+        #[arg(short, long, default_value = "./bucket")]
+        dir: PathBuf,
 
         /// Whether to parse JSON output
         #[arg(short = 'P', long, default_value = "false")]
@@ -54,9 +54,9 @@ pub enum Commands {
         #[arg(short, long, alias = "user-input")]
         input: String,
 
-        /// Context directory path
-        #[arg(short, long, default_value = "./context")]
-        context: PathBuf,
+        /// Data bucket directory path
+        #[arg(short, long, default_value = "./bucket")]
+        dir: PathBuf,
 
         /// Whether to parse JSON output
         #[arg(short = 'P', long, default_value = "false")]

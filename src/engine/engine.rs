@@ -1,33 +1,28 @@
 use anyhow::{Error, Result};
 use rune::termcolor::{ColorChoice, StandardStream};
-use rune::{Context, Diagnostics, Source, Sources, Value, Vm};
+use rune::{Diagnostics, Source, Sources, Value, Vm};
 use std::{path::Path, sync::Arc};
 
 pub struct RuneEngine {
     script_path: String,
-    context_path: String,
+    data_directory: String,
 }
 
 impl RuneEngine {
-    pub async fn new(script_path: &Path, context_path: &Path) -> Result<Self> {
+    pub async fn new(script_path: &Path, data_directory: &Path) -> Result<Self> {
         let script_path_str = script_path.to_string_lossy().to_string();
-        let context_path_str = context_path.to_string_lossy().to_string();
+        let data_directory_str = data_directory.to_string_lossy().to_string();
 
         Ok(Self {
             script_path: script_path_str,
-            context_path: context_path_str,
+            data_directory: data_directory_str,
         })
     }
 
     fn compile_vm(&self) -> Result<Vm> {
-        // Set global context path
-        super::modules::context::set_context_path(self.context_path.clone());
+        let mut rune_context = rune::Context::with_default_modules()?;
 
-        // Create Rune runtime context
-        let mut context = Context::with_default_modules()?;
-
-        // Install our custom modules
-        context.install(super::modules::module(true)?)?;
+        rune_context.install(super::modules::context::module(true)?)?;
 
         // Compile script
         let mut sources = Sources::new();
@@ -35,7 +30,7 @@ impl RuneEngine {
         sources.insert(Source::from_path(&self.script_path)?)?;
 
         let unit = rune::prepare(&mut sources)
-            .with_context(&context)
+            .with_context(&rune_context)
             .with_diagnostics(&mut diagnostics)
             .build();
 
@@ -45,19 +40,21 @@ impl RuneEngine {
         }
 
         let unit = unit?;
-        let runtime = context.runtime()?;
+        let runtime = rune_context.runtime()?;
         Ok(Vm::new(Arc::new(runtime), Arc::new(unit)))
     }
 
     pub async fn call_collect(&self) -> Result<Result<String, String>> {
         let mut vm = self.compile_vm()?;
-        let output = vm.call(["collect"], ())?;
+        let ctx = super::modules::context::Context::new(self.data_directory.clone());
+        let output = vm.call(["collect"], (ctx,))?;
         self.process_result(output)
     }
 
     pub async fn call_check(&self, user_input: &str) -> Result<Result<String, String>> {
         let mut vm = self.compile_vm()?;
-        let output = vm.call(["check"], (user_input,))?;
+        let ctx = super::modules::context::Context::new(self.data_directory.clone());
+        let output = vm.call(["check"], (ctx, user_input))?;
         self.process_result(output)
     }
 

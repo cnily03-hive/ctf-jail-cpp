@@ -74,7 +74,7 @@ fn format_result_output(result: &Result<String, String>, parse_json: bool) {
 struct AppState {
     rune_engine: Arc<RuneEngine>,
     sandbox_manager: Arc<SandboxManager>,
-    context_path: PathBuf,
+    bucket_path: PathBuf,
 }
 
 #[tokio::main]
@@ -85,33 +85,29 @@ async fn main() -> Result<()> {
         Commands::Listen {
             port,
             host,
-            context,
+            dir,
             exec,
-        } => run_server(port, host, context, exec).await,
-        Commands::Collect {
-            exec,
-            context,
-            parse,
-        } => run_collect(exec, context, parse).await,
+        } => run_server(port, host, dir, exec).await,
+        Commands::Collect { exec, dir, parse } => run_collect(exec, dir, parse).await,
         Commands::Check {
             exec,
             input,
-            context,
+            dir,
             parse,
-        } => run_check(exec, input, context, parse).await,
+        } => run_check(exec, input, dir, parse).await,
     }
 }
 
 async fn run_server(
     port: u16,
     host: String,
-    context: PathBuf,
+    bucket_path: PathBuf,
     exec: Option<PathBuf>,
 ) -> Result<()> {
     // Determine Rune script path
     let rune_script_path = match exec {
         Some(path) => path,
-        None => context.join(MAIN_RUNE_FILE),
+        None => bucket_path.join(MAIN_RUNE_FILE),
     };
 
     // Check if file exists
@@ -123,27 +119,27 @@ async fn run_server(
         std::process::exit(1);
     }
 
-    if !context.exists() {
+    if !bucket_path.exists() {
         eprintln!(
-            "Error: Context directory does not exist: {}",
-            context.display()
+            "Error: Data bucket does not exist: {}",
+            bucket_path.display()
         );
         std::process::exit(1);
     }
 
     println!("Startup parameters:");
     println!("  Server address: {}:{}", host, port);
-    println!("  Context directory: {}", context.display());
+    println!("  Data bucket: {}", bucket_path.display());
     println!("  Rune script: {}", rune_script_path.display());
 
     // Initialize components
-    let rune_engine = Arc::new(RuneEngine::new(&rune_script_path, &context).await?);
+    let rune_engine = Arc::new(RuneEngine::new(&rune_script_path, &bucket_path).await?);
     let sandbox_manager = Arc::new(SandboxManager::new());
 
     let state = AppState {
         rune_engine,
         sandbox_manager,
-        context_path: context.clone(),
+        bucket_path: bucket_path.clone(),
     };
 
     // Create routes
@@ -163,11 +159,11 @@ async fn run_server(
     Ok(())
 }
 
-async fn run_collect(exec: Option<PathBuf>, context: PathBuf, parse_json: bool) -> Result<()> {
+async fn run_collect(exec: Option<PathBuf>, bucket_path: PathBuf, parse_json: bool) -> Result<()> {
     // Determine Rune script path
     let file = match exec {
         Some(path) => path,
-        None => context.join(MAIN_RUNE_FILE),
+        None => bucket_path.join(MAIN_RUNE_FILE),
     };
 
     if !file.exists() {
@@ -175,31 +171,37 @@ async fn run_collect(exec: Option<PathBuf>, context: PathBuf, parse_json: bool) 
         std::process::exit(1);
     }
 
-    if !context.exists() {
+    if !bucket_path.exists() {
         eprintln!(
-            "Error: Context directory does not exist: {}",
-            context.display()
+            "Error: Data bucket does not exist: {}",
+            bucket_path.display()
         );
         std::process::exit(1);
     }
 
-    let rune_engine = RuneEngine::new(&file, &context).await?;
-    let result = rune_engine.call_collect().await?;
+    let rune_engine = RuneEngine::new(&file, &bucket_path).await?;
+    match rune_engine.call_collect().await {
+        Ok(result) => {
+            format_result_output(&result, parse_json);
+        }
+        Err(err) => {
+            eprintln!("{} {}", "RunTime Error:".red(), err);
+        }
+    }
 
-    format_result_output(&result, parse_json);
     Ok(())
 }
 
 async fn run_check(
     exec: Option<PathBuf>,
     user_input: String,
-    context: PathBuf,
+    bucket_path: PathBuf,
     parse_json: bool,
 ) -> Result<()> {
     // Determine Rune script path
     let file = match exec {
         Some(path) => path,
-        None => context.join(MAIN_RUNE_FILE),
+        None => bucket_path.join(MAIN_RUNE_FILE),
     };
 
     if !file.exists() {
@@ -207,29 +209,24 @@ async fn run_check(
         std::process::exit(1);
     }
 
-    if !context.exists() {
+    if !bucket_path.exists() {
         eprintln!(
-            "Error: Context directory does not exist: {}",
-            context.display()
+            "Error: Data bucket does not exist: {}",
+            bucket_path.display()
         );
         std::process::exit(1);
     }
 
-    let rune_engine = RuneEngine::new(&file, &context).await?;
-    let sandbox_manager = SandboxManager::new();
-
-    // Create temporary sandbox
-    let sandbox_id = uuid::Uuid::new_v4().to_string();
-    // let sandbox = sandbox_manager.create_sandbox(&sandbox_id).await?;
-
-    let result = rune_engine.call_check(&user_input).await?;
-
-    // Clean up sandbox
-    if let Err(err) = sandbox_manager.cleanup_sandbox(&sandbox_id).await {
-        eprintln!("Warning: Failed to clean up sandbox: {}", err);
+    let rune_engine = RuneEngine::new(&file, &bucket_path).await?;
+    match rune_engine.call_check(&user_input).await {
+        Ok(result) => {
+            format_result_output(&result, parse_json);
+        }
+        Err(err) => {
+            eprintln!("{} {}", "RunTime Error:".red(), err);
+        }
     }
 
-    format_result_output(&result, parse_json);
     Ok(())
 }
 
