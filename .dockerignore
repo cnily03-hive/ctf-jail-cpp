@@ -11,8 +11,9 @@ dist/
 .gitignore
 .devcontainer
 
-target/
 .cargo
+target/
+tests/
 
 .dockerignore
 Dockerfile

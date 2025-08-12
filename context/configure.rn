@@ -1,0 +1,9 @@
+pub fn collect() {
+    Err("Err must be a string")
+}
+
+pub fn check(user_input) {
+    Ok(#{
+        "Your input": user_input
+    })
+}
