@@ -20,16 +20,16 @@ impl RuneEngine {
     }
 
     fn compile_vm(&self) -> Result<Vm> {
-        // 设置全局的context路径
+        // Set global context path
         super::modules::context::set_context_path(self.context_path.clone());
 
-        // 创建Rune运行时上下文
+        // Create Rune runtime context
         let mut context = Context::with_default_modules()?;
 
-        // 安装我们的自定义模块
+        // Install our custom modules
         context.install(super::modules::module(true)?)?;
 
-        // 编译脚本
+        // Compile script
         let mut sources = Sources::new();
         let mut diagnostics = Diagnostics::new();
         sources.insert(Source::from_path(&self.script_path)?)?;
@@ -62,7 +62,7 @@ impl RuneEngine {
     }
 
     fn process_result(&self, value: Value) -> Result<Result<String, String>> {
-        // 尝试从Result类型中提取值
+        // Try to extract value from Result type
         match rune::from_value::<Result<Value, Value>>(value.clone()) {
             // rune returns Result
             Ok(result) => match result {
@@ -80,21 +80,22 @@ impl RuneEngine {
     }
 }
 
-/// 将 Rune Value 转换为 JSON 字符串
+/// Convert Rune Value to JSON string
 fn rune_value_throw_or_stringify(value: Value) -> Result<String> {
-    // 如果是 Error 对象，抛出运行时异常
+    // If it's an Error object, throw runtime exception
     if let Ok(e) = rune::from_value::<anyhow::Error>(value.clone()) {
         return Err(e);
     }
     if let Ok(e) = rune::from_value::<std::io::Error>(value.clone()) {
         return Err(e.into());
     }
-    // 尝试将 Rune Value 转换为 serde_json::Value
+    // Try to convert Rune Value to serde_json::Value
     match rune::to_value(&value) {
         Ok(json_value) => {
-            // 转换为 JSON 字符串
-            serde_json::to_string(&json_value)
-                .map_err(|e| anyhow::anyhow!("无法序列化值: {:?}, 错误: {}", value, e))
+            // Convert to JSON string
+            serde_json::to_string(&json_value).map_err(|e| {
+                anyhow::anyhow!("Unable to serialize value: {:?}, error: {}", value, e)
+            })
         }
         Err(e) => {
             // direct throw runtime error

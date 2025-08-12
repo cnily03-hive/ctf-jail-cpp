@@ -35,13 +35,13 @@ impl SandboxManager {
     pub async fn create_sandbox(&self, id: &str) -> Result<Sandbox> {
         let sandbox = Sandbox::new()?;
 
-        // 将沙箱添加到管理器中
+        // Add sandbox to manager
         {
             let mut sandboxes = self.sandboxes.write().await;
             sandboxes.insert(id.to_string(), sandbox);
         }
 
-        // 返回一个新的沙箱实例用于执行
+        // Return a new sandbox instance for execution
         Sandbox::new()
     }
 
@@ -49,7 +49,7 @@ impl SandboxManager {
         let mut sandboxes = self.sandboxes.write().await;
 
         if let Some(_sandbox) = sandboxes.remove(id) {
-            // TempDir 会在被drop时自动清理
+            // TempDir will be automatically cleaned up when dropped
             Ok(())
         } else {
             Err(anyhow!("Sandbox {} not found", id))

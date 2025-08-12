@@ -108,29 +108,35 @@ async fn run_server(
     context: PathBuf,
     exec: Option<PathBuf>,
 ) -> Result<()> {
-    // 确定Rune脚本路径
+    // Determine Rune script path
     let rune_script_path = match exec {
         Some(path) => path,
         None => context.join(MAIN_RUNE_FILE),
     };
 
-    // 检查文件是否存在
+    // Check if file exists
     if !rune_script_path.exists() {
-        eprintln!("错误: Rune脚本文件不存在: {}", rune_script_path.display());
+        eprintln!(
+            "Error: Rune script file does not exist: {}",
+            rune_script_path.display()
+        );
         std::process::exit(1);
     }
 
     if !context.exists() {
-        eprintln!("错误: 上下文目录不存在: {}", context.display());
+        eprintln!(
+            "Error: Context directory does not exist: {}",
+            context.display()
+        );
         std::process::exit(1);
     }
 
-    println!("启动参数:");
-    println!("  服务器地址: {}:{}", host, port);
-    println!("  上下文目录: {}", context.display());
-    println!("  Rune脚本: {}", rune_script_path.display());
+    println!("Startup parameters:");
+    println!("  Server address: {}:{}", host, port);
+    println!("  Context directory: {}", context.display());
+    println!("  Rune script: {}", rune_script_path.display());
 
-    // 初始化组件
+    // Initialize components
     let rune_engine = Arc::new(RuneEngine::new(&rune_script_path, &context).await?);
     let sandbox_manager = Arc::new(SandboxManager::new());
 
@@ -140,7 +146,7 @@ async fn run_server(
         context_path: context.clone(),
     };
 
-    // 创建路由
+    // Create routes
     let app = Router::new()
         .route("/api/collect", get(handle_collect))
         .route("/api/submit", post(handle_submit))
@@ -150,7 +156,7 @@ async fn run_server(
 
     let bind_address = format!("{}:{}", host, port);
     let listener = tokio::net::TcpListener::bind(&bind_address).await?;
-    println!("服务器运行在 http://{}", bind_address);
+    println!("Server running at http://{}", bind_address);
 
     axum::serve(listener, app).await?;
 
@@ -158,19 +164,22 @@ async fn run_server(
 }
 
 async fn run_collect(exec: Option<PathBuf>, context: PathBuf, parse_json: bool) -> Result<()> {
-    // 确定Rune脚本路径
+    // Determine Rune script path
     let file = match exec {
         Some(path) => path,
         None => context.join(MAIN_RUNE_FILE),
     };
 
     if !file.exists() {
-        eprintln!("错误: Rune脚本文件不存在: {}", file.display());
+        eprintln!("Error: Rune script file does not exist: {}", file.display());
         std::process::exit(1);
     }
 
     if !context.exists() {
-        eprintln!("错误: 上下文目录不存在: {}", context.display());
+        eprintln!(
+            "Error: Context directory does not exist: {}",
+            context.display()
+        );
         std::process::exit(1);
     }
 
@@ -187,34 +196,37 @@ async fn run_check(
     context: PathBuf,
     parse_json: bool,
 ) -> Result<()> {
-    // 确定Rune脚本路径
+    // Determine Rune script path
     let file = match exec {
         Some(path) => path,
         None => context.join(MAIN_RUNE_FILE),
     };
 
     if !file.exists() {
-        eprintln!("错误: Rune脚本文件不存在: {}", file.display());
+        eprintln!("Error: Rune script file does not exist: {}", file.display());
         std::process::exit(1);
     }
 
     if !context.exists() {
-        eprintln!("错误: 上下文目录不存在: {}", context.display());
+        eprintln!(
+            "Error: Context directory does not exist: {}",
+            context.display()
+        );
         std::process::exit(1);
     }
 
     let rune_engine = RuneEngine::new(&file, &context).await?;
     let sandbox_manager = SandboxManager::new();
 
-    // 创建临时沙箱
+    // Create temporary sandbox
     let sandbox_id = uuid::Uuid::new_v4().to_string();
     // let sandbox = sandbox_manager.create_sandbox(&sandbox_id).await?;
 
     let result = rune_engine.call_check(&user_input).await?;
 
-    // 清理沙箱
+    // Clean up sandbox
     if let Err(err) = sandbox_manager.cleanup_sandbox(&sandbox_id).await {
-        eprintln!("警告: 清理沙箱失败: {}", err);
+        eprintln!("Warning: Failed to clean up sandbox: {}", err);
     }
 
     format_result_output(&result, parse_json);
@@ -226,7 +238,7 @@ async fn handle_collect(
 ) -> impl IntoResponse {
     match state.rune_engine.call_collect().await {
         Ok(result) => {
-            // result 现在是 String，需要解析为 JSON 或直接返回
+            // result is now a String, needs to be parsed as JSON or returned directly
             match result {
                 Ok(json_str) => (
                     StatusCode::OK,
@@ -250,7 +262,7 @@ async fn handle_submit(
     axum::extract::State(state): axum::extract::State<AppState>,
     body: String,
 ) -> impl IntoResponse {
-    // 创建沙箱环境
+    // Create sandbox environment
     let sandbox_id = Uuid::new_v4().to_string();
     // let sandbox = match state.sandbox_manager.create_sandbox(&sandbox_id).await {
     //     Ok(sandbox) => sandbox,
@@ -259,17 +271,17 @@ async fn handle_submit(
     //     }
     // };
 
-    // 在沙箱中执行rune脚本
+    // Execute rune script in sandbox
     let deep_result = state.rune_engine.call_check(&body).await;
 
-    // 清理沙箱
+    // Clean up sandbox
     if let Err(err) = state.sandbox_manager.cleanup_sandbox(&sandbox_id).await {
         eprintln!("Failed to cleanup sandbox {}: {}", sandbox_id, err);
     }
 
     match deep_result {
         Ok(result) => {
-            // output 现在是 String，尝试解析为 JSON
+            // output is now a String, try to parse as JSON
             match result {
                 Ok(json_str) => (
                     StatusCode::OK,
